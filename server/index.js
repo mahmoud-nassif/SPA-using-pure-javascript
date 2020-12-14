@@ -6,25 +6,45 @@ const VideoRequestData = require('./data/video-requests.data');
 const UserData = require('./data/user.data');
 const cors = require('cors');
 const mongoose = require('./models/mongo.config');
-
+const multer= require('multer');
+const videoRequestsData = require('./data/video-requests.data');
+const upload=multer()
 if (!Object.keys(mongoose).length) return;
 
 app.use(cors());
 
 app.use(bodyParser.urlencoded({ extended: true }));
+app.use(express.json());
 
 app.get('/', (req, res) =>
   res.send('Welcome to semicolon academy APIs, use /video-request to get data')
 );
 
-app.post('/video-request', async (req, res, next) => {
+app.post('/video-request', upload.none(),async (req, res, next) => {
   const response = await VideoRequestData.createRequest(req.body);
   res.send(response);
   next();
 });
 
 app.get('/video-request', async (req, res, next) => {
-  const data = await VideoRequestData.getAllVideoRequests();
+  const{sortBy,searchTerm,filterBy}=req.query
+  let data;
+  if(searchTerm){
+    data=await videoRequestsData.searchRequests(searchTerm,filterBy)
+  }
+  else{
+  data = await VideoRequestData.getAllVideoRequests(filterBy);
+  }
+
+  if(sortBy==="topVotedFirst"){
+    data=data.sort((prev,next)=>{
+      if(prev.votes.ups.length - prev.votes.downs.length > 
+        next.votes.ups.length - next.votes.downs.length)
+      {return -1}
+      else 
+      {return 1}
+    })
+  }
   res.send(data);
   next();
 });
@@ -41,12 +61,12 @@ app.post('/users/login', async (req, res, next) => {
   next();
 });
 
-app.use(express.json());
+
 
 app.put('/video-request/vote', async (req, res, next) => {
-  const { id, vote_type } = req.body;
-  const response = await VideoRequestData.updateVoteForRequest(id, vote_type);
-  res.send(response);
+  const { id, vote_type, user_id } = req.body;
+  const response = await VideoRequestData.updateVoteForRequest(id, vote_type, user_id);
+  res.send(response.votes);
   next();
 });
 
